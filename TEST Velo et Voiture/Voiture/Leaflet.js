@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carte des Parkings et Stations de Vélos</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        #map { height: 600px; }
+    </style>
+</head>
+<body>
+    <h1>Carte des Parkings et Stations de Vélos</h1>
+    <div id="map"></div>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        var map = L.map('map').setView([43.610769, 3.876716], 13);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        fetch('/parkings')
+            .then(response => response.json())
+            .then(data => {
+                data.forEach(parking => {
+                    var marker = L.marker([parking[1][1], parking[1][0]], {icon: L.icon({iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]})})
+                        .addTo(map)
+                        .bindPopup(parking[0]);
+
+                    marker.on('click', function(e) {
+                        var lat = parking[1][1];
+                        var lon = parking[1][0];
+                        fetch('/nearest_station', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ lat: lat, lon: lon })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.error) {
+                                alert(data.error);
+                            } else {
+                                alert(`La station de vélos la plus proche est : ${data.name}\nCoordonnées : ${data.coordinates}\nVélos disponibles : ${data.available_bikes}`);
+                            }
+                        });
+                    });
+                });
+            });
+    </script>
+</body>
+</html>
+

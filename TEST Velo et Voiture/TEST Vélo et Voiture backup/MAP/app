@@ -1,0 +1,53 @@
+from flask import Flask, render_template, request, jsonify
+import requests
+from geopy.distance import geodesic
+
+app = Flask(__name__)
+
+# Fonction pour obtenir la liste des parkings
+def obtenir_liste_parkings():
+    reponse = requests.get("https://portail-api-data.montpellier3m.fr/offstreetparking?limit=1000")
+    donnees = reponse.json()
+    return [(parking['name']['value'], parking['location']['value']['coordinates']) for parking in donnees]
+
+# Fonction pour obtenir la liste des stations de vélos
+def obtenir_liste_stations():
+    reponse = requests.get("https://portail-api-data.montpellier3m.fr/bikestation?limit=1000")
+    donnees = reponse.json()
+    return [(station['address']['value']['streetAddress'], station['location']['value']['coordinates'], station['availableBikeNumber']['value']) for station in donnees]
+
+# Fonction pour trouver la station de vélos la plus proche avec des vélos disponibles
+def trouver_station_proche(coordinates):
+    stations = obtenir_liste_stations()
+    stations_disponibles = [station for station in stations if station[2] > 0]
+    if not stations_disponibles:
+        return None
+    stations_disponibles.sort(key=lambda station: geodesic(coordinates, station[1]).meters)
+    return stations_disponibles[0]
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/parkings')
+def parkings():
+    parkings = obtenir_liste_parkings()
+    return jsonify(parkings)
+
+@app.route('/nearest_station', methods=['POST'])
+def nearest_station():
+    data = request.json
+    lat = data['lat']
+    lon = data['lon']
+    station_proche = trouver_station_proche((lat, lon))
+    if station_proche:
+        return jsonify({
+            'name': station_proche[0],
+            'coordinates': station_proche[1],
+            'available_bikes': station_proche[2]
+        })
+    else:
+        return jsonify({'error': 'Aucune station de vélos disponible à proximité.'}), 404
+
+if __name__ == '__main__':
+    app.run(debug=True)
